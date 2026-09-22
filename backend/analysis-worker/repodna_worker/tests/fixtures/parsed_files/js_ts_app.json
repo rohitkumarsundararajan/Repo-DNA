@@ -1,0 +1,81 @@
+[
+    {
+        "path": "src/components/User.tsx",
+        "language": "typescript",
+        "loc": 30,
+        "imports": [
+            {
+                "module": "./UserService",
+                "names": [
+                    "UserService"
+                ],
+                "is_relative": true,
+                "level": 0
+            },
+            {
+                "module": "../utils/format",
+                "names": [
+                    "formatUser"
+                ],
+                "is_relative": true,
+                "level": 0
+            },
+            {
+                "module": "react",
+                "names": [
+                    "useState"
+                ],
+                "is_relative": false,
+                "level": 0
+            }
+        ],
+        "functions": [],
+        "classes": [],
+        "calls": []
+    },
+    {
+        "path": "src/components/UserService.ts",
+        "language": "typescript",
+        "loc": 25,
+        "imports": [
+            {
+                "module": "./api",
+                "names": [
+                    "api"
+                ],
+                "is_relative": true,
+                "level": 0
+            }
+        ],
+        "functions": [],
+        "classes": [],
+        "calls": []
+    },
+    {
+        "path": "src/components/api.ts",
+        "language": "typescript",
+        "loc": 20,
+        "imports": [],
+        "functions": [],
+        "classes": [],
+        "calls": []
+    },
+    {
+        "path": "src/utils/format.ts",
+        "language": "typescript",
+        "loc": 15,
+        "imports": [],
+        "functions": [],
+        "classes": [],
+        "calls": []
+    },
+    {
+        "path": "src/utils/index.ts",
+        "language": "typescript",
+        "loc": 10,
+        "imports": [],
+        "functions": [],
+        "classes": [],
+        "calls": []
+    }
+]

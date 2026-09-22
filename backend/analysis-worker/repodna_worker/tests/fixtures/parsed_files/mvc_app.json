@@ -1,0 +1,46 @@
+[
+    {
+        "path": "src/controller/UserController.py",
+        "language": "python",
+        "loc": 20,
+        "imports": [
+            {
+                "module": "src.model.User",
+                "names": [
+                    "User"
+                ],
+                "is_relative": false,
+                "level": 0
+            },
+            {
+                "module": "src.view.UserView",
+                "names": [
+                    "UserView"
+                ],
+                "is_relative": false,
+                "level": 0
+            }
+        ],
+        "functions": [],
+        "classes": [],
+        "calls": []
+    },
+    {
+        "path": "src/model/User.py",
+        "language": "python",
+        "loc": 15,
+        "imports": [],
+        "functions": [],
+        "classes": [],
+        "calls": []
+    },
+    {
+        "path": "src/view/UserView.py",
+        "language": "python",
+        "loc": 12,
+        "imports": [],
+        "functions": [],
+        "classes": [],
+        "calls": []
+    }
+]
