@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://repodna.dev/schemas/job_message.schema.json",
+  "title": "JobMessage",
+  "description": "Message pushed to Redis (repodna:jobs) by the API when a job is created. Consumed by the analysis worker.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["job_id", "source_type"],
+  "properties": {
+    "job_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUID of the job row in Postgres. Primary key used for all status/result callbacks. NOTE: 'format: uuid' is annotation-only in most validators (networknt, python jsonschema) unless format assertion is explicitly enabled -- turn that on, or add a regex 'pattern' here as a backup, or invalid UUIDs will pass silently."
+    },
+    "source_type": {
+      "type": "string",
+      "enum": ["git", "zip"],
+      "description": "Which of repo_url / zip_path is populated. Exactly one must be a non-null string; the other must be null -- enforced below."
+    },
+    "repo_url": {
+      "type": ["string", "null"],
+      "pattern": "^https://",
+      "description": "Public HTTPS GitHub/GitLab URL. Must be a real string when source_type is 'git', and must be null when source_type is 'zip'."
+    },
+    "zip_path": {
+      "type": ["string", "null"],
+      "description": "Path on the shared volume where the uploaded ZIP was saved. Must be a real string when source_type is 'zip', and must be null when source_type is 'git'."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "source_type": { "const": "git" } } },
+      "then": {
+        "required": ["repo_url"],
+        "properties": {
+          "repo_url": { "type": "string", "pattern": "^https://" },
+          "zip_path": { "const": null }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "source_type": { "const": "zip" } } },
+      "then": {
+        "required": ["zip_path"],
+        "properties": {
+          "zip_path": { "type": "string" },
+          "repo_url": { "const": null }
+        }
+      }
+    }
+  ]
+}
