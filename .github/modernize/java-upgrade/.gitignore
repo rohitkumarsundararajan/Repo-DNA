@@ -1,0 +1,8 @@
+
+# Generated upgrade artifacts remain ignored by default.
+**/*
+
+# Keep workflow configuration and hook scripts versioned.
+!.gitignore
+!hooks/
+!hooks/**
