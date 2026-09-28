@@ -1,8 +1,8 @@
 """Shared read-only filesystem helpers for detection steps.
 
-Nothing here executes repository content. Files are only opened and read.
+Nothing here executes repository content; files are only opened and read.
 """
-"""small shared helper I added, so both modules walk the tree and read files the same way"""
+
 from __future__ import annotations
 
 import json

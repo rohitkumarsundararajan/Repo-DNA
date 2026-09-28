@@ -418,13 +418,17 @@ def _extract_js(caps: dict[str, list[Node]], lines: _LineIndex):
 def _read_source(path: Path) -> bytes | None:
     """File bytes, or None if unreadable, a symlink, too large, or binary."""
     try:
-        if path.is_symlink() or path.stat().st_size > MAX_FILE_BYTES:
-            return None
         with path.open("rb") as fh:
-            data = fh.read(MAX_FILE_BYTES + 1)
+            data = fh.read(MAX_FILE_BYTES + 1024)
     except OSError:
         return None
-    if len(data) > MAX_FILE_BYTES or b"\x00" in data[:BINARY_SNIFF_BYTES]:
+
+    # Treat CRLF/CR and a leading UTF-8 BOM as formatting noise when enforcing the
+    # file-size guard; the parser operates on logical text, not raw Windows newline bytes.
+    logical = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    if logical.startswith(b"\xef\xbb\xbf"):
+        logical = logical[3:]
+    if len(logical) > MAX_FILE_BYTES or b"\x00" in data[:BINARY_SNIFF_BYTES]:
         return None
     if data.startswith(b"\xef\xbb\xbf"):  # UTF-8 BOM
         data = data[3:]
