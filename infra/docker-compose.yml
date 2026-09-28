@@ -41,11 +41,15 @@ services:
       redis:
         condition: service_healthy
     environment:
-      # jdbc:// format expected by Spring Data JPA
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-repodna}
+      DB_USER: ${POSTGRES_USER:-repodna}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-repodna}
+      SPRING_FLYWAY_LOCATIONS: filesystem:/db/migrations
       REDIS_HOST: ${REDIS_HOST:-redis}
       JWT_SECRET: ${JWT_SECRET}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+    volumes:
+      - ../db/migrations:/db/migrations:ro
     ports:
       - "8080:8080"
 

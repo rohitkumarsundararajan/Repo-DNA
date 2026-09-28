@@ -1,3 +1,15 @@
 spring:
   application:
     name: api
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/repodna}
+    username: ${DB_USER:repodna}
+    password: ${DB_PASSWORD:repodna}
+
+  flyway:
+    locations: filesystem:../../db/migrations
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
