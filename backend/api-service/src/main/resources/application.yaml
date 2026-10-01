@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:file:../../infra/.env[.properties]
   application:
     name: api
 

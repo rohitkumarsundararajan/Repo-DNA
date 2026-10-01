@@ -1,8 +1,5 @@
 package com.repodna.api.common;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
@@ -10,28 +7,35 @@ import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 /**
- * Returns a 403 ApiError when an authenticated user lacks permission.
- * Runs inside the security filter chain, so GlobalExceptionHandler never sees it.
+ * Returns a 403 in the standard ApiError shape when a logged-in user is not allowed
+ * to do something. Runs inside the security filter chain, before any controller.
  */
 @Component
 public class ApiAccessDeniedHandler implements AccessDeniedHandler {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    private final ObjectMapper objectMapper;
+
+    public ApiAccessDeniedHandler(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     @Override
-    public void handle(HttpServletRequest request, HttpServletResponse response,
+    public void handle(HttpServletRequest request,
+                       HttpServletResponse response,
                        AccessDeniedException accessDeniedException) throws IOException {
-        ApiError body = ApiError.of(HttpStatus.FORBIDDEN.value(),
-                HttpStatus.FORBIDDEN.getReasonPhrase(),
+        HttpStatus status = HttpStatus.FORBIDDEN;
+        ApiError body = ApiError.of(status.value(), status.getReasonPhrase(),
                 "You do not have permission to perform this action", request.getRequestURI());
-        response.setStatus(HttpStatus.FORBIDDEN.value());
+
+        response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        MAPPER.writeValue(response.getOutputStream(), body);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        objectMapper.writeValue(response.getOutputStream(), body);
     }
 }
