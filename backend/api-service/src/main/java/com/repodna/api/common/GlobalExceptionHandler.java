@@ -1,5 +1,6 @@
 package com.repodna.api.common;
 
+import com.repodna.api.auth.EmailAlreadyExistsException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -56,6 +58,13 @@ public class GlobalExceptionHandler {
 
     // ---- 401 / 403 (when thrown from inside controllers or services) ----
 
+    // Wrong email or password on login (more specific than AuthenticationException below)
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ApiError> handleBadCredentials(BadCredentialsException ex,
+                                                         HttpServletRequest request) {
+        return build(HttpStatus.UNAUTHORIZED, "Invalid email or password", request, null);
+    }
+
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiError> handleUnauthorized(AuthenticationException ex,
                                                        HttpServletRequest request) {
@@ -86,6 +95,13 @@ public class GlobalExceptionHandler {
                                                            HttpServletRequest request) {
         return build(HttpStatus.METHOD_NOT_ALLOWED, "HTTP method not supported for this endpoint",
                 request, null);
+    }
+
+    // Registering an email that already exists
+    @ExceptionHandler(EmailAlreadyExistsException.class)
+    public ResponseEntity<ApiError> handleEmailExists(EmailAlreadyExistsException ex,
+                                                      HttpServletRequest request) {
+        return build(HttpStatus.CONFLICT, ex.getMessage(), request, null);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
