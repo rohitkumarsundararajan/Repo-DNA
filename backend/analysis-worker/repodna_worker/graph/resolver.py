@@ -51,6 +51,18 @@ class ImportResolver:
             if import_info.module:
                 module_path = Path(*import_info.module.split("."))
                 base = base / module_path
+            else:
+                # Handles imports such as:
+                # from . import json
+                # from . import cli
+                #
+                # The imported name is the actual target, not the
+                # current package's __init__.py.
+                if not import_info.names:
+                    return None
+
+                module_path = Path(import_info.names[0])
+                base = base / module_path
 
             candidates = [
                 base.with_suffix(".py"),
