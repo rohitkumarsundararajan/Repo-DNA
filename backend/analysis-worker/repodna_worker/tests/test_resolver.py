@@ -79,6 +79,39 @@ def test_resolve_python_relative_import(tmp_path: Path) -> None:
     assert result == user_service.resolve()
 
 
+def test_resolve_python_relative_import_without_module(
+    tmp_path: Path,
+) -> None:
+    """Resolve a target imported directly from the current package."""
+
+    repository = tmp_path / "repo"
+    package = repository / "src" / "service"
+    package_init = package / "__init__.py"
+    json_module = package / "json.py"
+
+    package.mkdir(parents=True)
+    package_init.write_text("# package")
+    json_module.write_text("# json module")
+
+    parsed_file = ParsedFile(
+        path="src/service/consumer.py",
+        language="python",
+        loc=20,
+    )
+    import_info = ImportInfo(
+        module="",
+        names=["json"],
+        is_relative=True,
+        level=1,
+    )
+
+    resolver = ImportResolver(repository)
+
+    result = resolver.resolve_import(parsed_file, import_info)
+
+    assert result == json_module.resolve()
+
+
 def test_resolve_python_package_init(tmp_path: Path) -> None:
     """Test resolving a Python package through __init__.py."""
 
