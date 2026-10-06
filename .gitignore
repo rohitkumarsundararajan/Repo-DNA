@@ -60,4 +60,8 @@ dist/
 .DS_Store
 Thumbs.db
 
-backend/api-service/uploads/
+backend/api-service/uploads/backend/api-service/running.json
+backend/api-service/result.json
+backend/api-service/*.json.tmp
+backend/api-service/target/
+infra/.env
