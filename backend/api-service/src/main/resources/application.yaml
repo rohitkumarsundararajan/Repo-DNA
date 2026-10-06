@@ -19,6 +19,8 @@ spring:
   data:
     redis:
       host: ${REDIS_HOST:localhost}
+      timeout: 2s
+      connect-timeout: 2s
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
 
@@ -37,3 +39,5 @@ app:
        
   storage:
     zip-dir: ${ZIP_DIR:./uploads}
+  queue:
+    jobs-key: ${QUEUE_JOBS_KEY:repodna:jobs}
