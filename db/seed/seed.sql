@@ -30,7 +30,7 @@ ON CONFLICT (email) DO NOTHING;
 INSERT INTO jobs (id, user_id, source_type, repo_url, status, created_at, finished_at)
 VALUES ('3f9c1a2e-6b3d-4e7a-9c1a-2e6b3d4e7a9c',
         (SELECT id FROM users WHERE email = 'test@repodna.dev'),
-        'GITHUB_URL',
+        'git',
         'https://github.com/repodna-demo/mini-flask-shop.git',
         'DONE',
         '2026-09-20T14:31:57Z',
