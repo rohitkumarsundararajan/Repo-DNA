@@ -37,8 +37,9 @@ public class ResultIngestionService {
 
         int updated;
         if ("RUNNING".equals(request.status())) {
-            updated = jdbc.update(
-                    "UPDATE jobs SET status = 'RUNNING' WHERE id = ? AND status IN ('QUEUED', 'RUNNING')",
+                updated = jdbc.update(
+                    "UPDATE jobs SET status = 'RUNNING', started_at = COALESCE(started_at, now()) "
+                            + "WHERE id = ? AND status IN ('QUEUED', 'RUNNING')",
                     jobId);
         } else if ("FAILED".equals(request.status())) {
             String error = (request.error() == null || request.error().isBlank())

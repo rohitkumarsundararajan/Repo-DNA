@@ -50,4 +50,7 @@ public class Job {
 
     @Column(name = "finished_at")
     private Instant finishedAt;
+
+    @Column(name = "started_at")
+    private Instant startedAt;
 }
