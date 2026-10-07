@@ -2,6 +2,7 @@ package com.repodna.api.common;
 
 import com.repodna.api.auth.EmailAlreadyExistsException;
 import jakarta.servlet.http.HttpServletRequest;
+import com.repodna.api.result.ResultNotReadyException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -101,6 +102,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(EmailAlreadyExistsException.class)
     public ResponseEntity<ApiError> handleEmailExists(EmailAlreadyExistsException ex,
                                                       HttpServletRequest request) {
+        return build(HttpStatus.CONFLICT, ex.getMessage(), request, null);
+    }
+
+        // Result requested before the job is DONE
+    @ExceptionHandler(ResultNotReadyException.class)
+    public ResponseEntity<ApiError> handleResultNotReady(ResultNotReadyException ex,
+                                                         HttpServletRequest request) {
         return build(HttpStatus.CONFLICT, ex.getMessage(), request, null);
     }
 
