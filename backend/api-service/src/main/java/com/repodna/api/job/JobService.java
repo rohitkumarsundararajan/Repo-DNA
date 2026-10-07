@@ -1,6 +1,7 @@
 package com.repodna.api.job;
 
 import com.repodna.api.common.ResourceNotFoundException;
+import com.repodna.api.queue.JobQueueProducer;
 import com.repodna.api.user.User;
 import com.repodna.api.user.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,19 +24,22 @@ public class JobService {
 
     private final JobRepository jobRepository;
     private final UserRepository userRepository;
+    private final JobQueueProducer jobQueueProducer;
     private final Path zipDir;
 
     public JobService(JobRepository jobRepository,
                       UserRepository userRepository,
+                      JobQueueProducer jobQueueProducer,
                       @Value("${app.storage.zip-dir}") String zipDir) {
         this.jobRepository = jobRepository;
         this.userRepository = userRepository;
+        this.jobQueueProducer = jobQueueProducer;
         this.zipDir = Path.of(zipDir).toAbsolutePath().normalize();
     }
 
     /**
-     * Finds the id of the logged-in user. The JWT subject is assumed to be the user's email.
-     * If your JwtAuthFilter puts something else in the Authentication, change ONLY this method.
+     * Finds the id of the logged-in user. The JWT subject is the numeric user id,
+     * but an email is also accepted.
      */
     public Long currentUserId(Authentication authentication) {
         String name = authentication.getName();
@@ -60,7 +64,10 @@ public class JobService {
         job.setUserId(userId);
         job.setSourceType(SourceType.GIT);
         job.setRepoUrl(url);
-        return jobRepository.save(job);
+
+        Job saved = jobRepository.save(job);
+        jobQueueProducer.enqueueAfterCommit(saved);
+        return saved;
     }
 
     public Job createFromZip(Long userId, MultipartFile file) {
@@ -92,7 +99,9 @@ public class JobService {
         job.setSourceType(SourceType.ZIP);
         job.setZipPath(target.toString());
         try {
-            return jobRepository.save(job);
+            Job saved = jobRepository.save(job);
+            jobQueueProducer.enqueueAfterCommit(saved);
+            return saved;
         } catch (RuntimeException e) {
             // Do not leave an orphan file behind if the row could not be saved.
             try {
