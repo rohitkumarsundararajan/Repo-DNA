@@ -1,0 +1,43 @@
+spring:
+  config:
+    import: optional:file:../../infra/.env[.properties]
+  application:
+    name: api
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/repodna}
+    username: ${DB_USER:repodna}
+    password: ${DB_PASSWORD}
+
+  flyway:
+    locations: filesystem:../../db/migrations
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      timeout: 2s
+      connect-timeout: 2s
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 55MB
+
+app:
+  security:
+    jwt:
+      # No default on purpose: the app must fail at startup if these are missing.
+      secret: ${JWT_SECRET}
+      expiry-minutes: ${JWT_EXPIRY_MINUTES:60}
+    internal-api-key: ${INTERNAL_API_KEY}
+       
+  storage:
+    zip-dir: ${ZIP_DIR:./uploads}
+  queue:
+    jobs-key: ${QUEUE_JOBS_KEY:repodna:jobs}

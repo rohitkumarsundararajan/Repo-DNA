@@ -1,0 +1,50 @@
+[
+    {
+        "path": "src/a.py",
+        "language": "python",
+        "loc": 10,
+        "imports": [
+            {
+                "module": "src.b",
+                "names": [],
+                "is_relative": false,
+                "level": 0
+            }
+        ],
+        "functions": [],
+        "classes": [],
+        "calls": []
+    },
+    {
+        "path": "src/b.py",
+        "language": "python",
+        "loc": 10,
+        "imports": [
+            {
+                "module": "src.c",
+                "names": [],
+                "is_relative": false,
+                "level": 0
+            }
+        ],
+        "functions": [],
+        "classes": [],
+        "calls": []
+    },
+    {
+        "path": "src/c.py",
+        "language": "python",
+        "loc": 10,
+        "imports": [
+            {
+                "module": "src.a",
+                "names": [],
+                "is_relative": false,
+                "level": 0
+            }
+        ],
+        "functions": [],
+        "classes": [],
+        "calls": []
+    }
+]

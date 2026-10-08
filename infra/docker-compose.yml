@@ -1,0 +1,78 @@
+services:
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-repodna}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-repodna}
+      POSTGRES_DB: ${POSTGRES_DB:-repodna}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-repodna} -d ${POSTGRES_DB:-repodna}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  api-service:
+    build:
+      context: ../backend/api-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-repodna}
+      DB_USER: ${POSTGRES_USER:-repodna}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-repodna}
+      SPRING_FLYWAY_LOCATIONS: filesystem:/db/migrations
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+    volumes:
+      - ../db/migrations:/db/migrations:ro
+    ports:
+      - "8080:8080"
+
+  analysis-worker:
+    build:
+      context: ../backend/analysis-worker
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # postgresql:// format expected by the Python DB client
+      DB_URL: postgresql://${POSTGRES_USER:-repodna}:${POSTGRES_PASSWORD:-repodna}@postgres:5432/${POSTGRES_DB:-repodna}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+    # Grants the worker access to the host's Docker engine so it can launch a
+    # disposable sandbox container per analysis job. The worker talks to the
+    # socket via the Python Docker SDK, not the Docker CLI.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  pgdata:
