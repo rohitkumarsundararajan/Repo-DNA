@@ -41,3 +41,6 @@ app:
     zip-dir: ${ZIP_DIR:./uploads}
   queue:
     jobs-key: ${QUEUE_JOBS_KEY:repodna:jobs}
+
+  jobs:
+    running-timeout-minutes: ${JOB_RUNNING_TIMEOUT_MINUTES:10}
