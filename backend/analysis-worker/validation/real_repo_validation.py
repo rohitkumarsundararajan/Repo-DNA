@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 
 # Make repodna_worker importable when this file is executed directly.
@@ -17,6 +18,8 @@ from repodna_worker.scoring.dna import calculate_dna_scores
 
 def validate_repository(repo_path: str) -> None:
     root = Path(repo_path).resolve()
+    timings: dict[str, float] = {}
+    overall_started = time.perf_counter()
 
     if not root.exists():
         raise FileNotFoundError(f"Repository does not exist: {root}")
@@ -28,18 +31,22 @@ def validate_repository(repo_path: str) -> None:
     # 1. Parse repository
     print("\n[1] Parsing repository...")
 
+    started = time.perf_counter()
     parsed_files = parse_repository(
         root,
         max_workers=4,
     )
+    timings["parse"] = time.perf_counter() - started
 
     print(f"Parsed files: {len(parsed_files)}")
 
     # 2. Build dependency graph
     print("\n[2] Building dependency graph...")
 
+    started = time.perf_counter()
     builder = GraphBuilder(root)
     graph = builder.build(parsed_files)
+    timings["graph"] = time.perf_counter() - started
 
     print(f"Graph nodes: {len(graph.nodes)}")
     print(
@@ -50,7 +57,9 @@ def validate_repository(repo_path: str) -> None:
     # 3. Detect cycles
     print("\n[3] Detecting cycles...")
 
+    started = time.perf_counter()
     cycles = find_cycles(graph)
+    timings["cycles"] = time.perf_counter() - started
 
     print(f"Cycles found: {len(cycles)}")
 
@@ -65,7 +74,9 @@ def validate_repository(repo_path: str) -> None:
     # 4. Detect architecture
     print("\n[4] Detecting architecture pattern...")
 
+    started = time.perf_counter()
     architecture = detect_pattern(graph)
+    timings["architecture"] = time.perf_counter() - started
 
     print(f"Pattern: {architecture['pattern']}")
     print(f"Evidence: {architecture['evidence']}")
@@ -73,8 +84,10 @@ def validate_repository(repo_path: str) -> None:
     # 5. Detect violations
     print("\n[5] Detecting architectural violations...")
 
+    started = time.perf_counter()
     violation_result = detect_violations(graph)
     violations = violation_result["violations"]
+    timings["violations"] = time.perf_counter() - started
 
     print(f"Violations found: {len(violations)}")
 
@@ -92,12 +105,14 @@ def validate_repository(repo_path: str) -> None:
     # 6. DNA scores
     print("\n[6] Calculating DNA scores...")
 
+    started = time.perf_counter()
     scores = calculate_dna_scores(
         graph=graph,
         cycles=cycles,
         architecture=architecture,
         files=parsed_files,
     )
+    timings["scoring"] = time.perf_counter() - started
 
     print(f"Scores: {scores}")
 
@@ -113,6 +128,12 @@ def validate_repository(repo_path: str) -> None:
         )
 
     print("PASS: basic sanity checks")
+    timings["total"] = time.perf_counter() - overall_started
+    print(
+        "TIMINGS: "
+        + " ".join(f"{name}={seconds:.3f}s" for name, seconds in timings.items())
+        + f" parsed_files={len(parsed_files)}"
+    )
 
     print("\n" + "=" * 80)
     print("VALIDATION COMPLETE")
@@ -120,10 +141,13 @@ def validate_repository(repo_path: str) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    repository_paths = sys.argv[1:]
+    if len(repository_paths) not in (1, 3):
         print(
-            "Usage: python real_repo_validation.py <repository-path>"
+            "Usage: python real_repo_validation.py <repository-path> "
+            "[<small-repository> <medium-repository>]"
         )
         raise SystemExit(1)
 
-    validate_repository(sys.argv[1])
+    for repository_path in repository_paths:
+        validate_repository(repository_path)

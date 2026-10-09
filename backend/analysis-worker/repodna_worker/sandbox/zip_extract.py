@@ -6,9 +6,12 @@ import stat
 import zipfile
 from pathlib import Path
 
+from ..consumer import config
 
-DEFAULT_MAX_TOTAL_SIZE = 512 * 1024 * 1024
-DEFAULT_MAX_FILES = 10_000
+
+DEFAULT_MAX_TOTAL_SIZE = config.MAX_REPO_SIZE_MB * 1024 * 1024
+DEFAULT_MAX_FILE_SIZE = config.MAX_FILE_SIZE_MB * 1024 * 1024
+DEFAULT_MAX_FILES = config.MAX_FILES
 
 
 class UnsafeZipError(ValueError):
@@ -35,9 +38,10 @@ def extract_zip(
     *,
     max_total_size: int = DEFAULT_MAX_TOTAL_SIZE,
     max_files: int = DEFAULT_MAX_FILES,
+    max_file_size: int = DEFAULT_MAX_FILE_SIZE,
 ) -> Path:
     """Safely extract an archive, rejecting unsafe entries before writing."""
-    if max_total_size < 0 or max_files < 0:
+    if min(max_total_size, max_files, max_file_size) < 0:
         raise ValueError("ZIP limits must be non-negative")
 
     destination_path = Path(destination).resolve()
@@ -57,6 +61,8 @@ def extract_zip(
             file_count += 1
             if file_count > max_files:
                 raise UnsafeZipError("ZIP file count limit exceeded")
+            if info.file_size > max_file_size:
+                raise UnsafeZipError(f"ZIP member size limit exceeded: {info.filename}")
             total_size += info.file_size
             if total_size > max_total_size:
                 raise UnsafeZipError("ZIP uncompressed size limit exceeded")

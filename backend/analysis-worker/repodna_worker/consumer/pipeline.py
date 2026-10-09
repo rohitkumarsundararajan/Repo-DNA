@@ -14,8 +14,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import signal
 import shutil
 import tempfile
+import threading
 import time
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
@@ -25,12 +27,46 @@ from typing import Any, Callable, ContextManager, Iterator
 import requests
 from jsonschema import Draft202012Validator
 
+from ..sandbox.resource_limits import validate_repository
+from . import config
+
 log = logging.getLogger("repodna.pipeline")
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _DEFAULT_RESULT_SCHEMA_PATH = _REPO_ROOT / "contract" / "result.schema.json"
 
 MAX_FAILURE_MESSAGE_CHARS = 500
+
+
+@contextmanager
+def _job_deadline(seconds: int) -> Iterator[float]:
+    """Interrupt a job at its deadline where the runtime supports SIGALRM."""
+    deadline = time.monotonic() + seconds
+    can_interrupt = (
+        hasattr(signal, "setitimer")
+        and threading.current_thread() is threading.main_thread()
+    )
+    if not can_interrupt:
+        yield deadline
+        return
+
+    started = time.monotonic()
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    previous_timer = signal.getitimer(signal.ITIMER_REAL)
+
+    def timeout_handler(_signum, _frame) -> None:
+        raise TimeoutError(f"job exceeded {seconds} second timeout")
+
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield deadline
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+        if previous_timer[0] > 0:
+            remaining = max(previous_timer[0] - (time.monotonic() - started), 0.001)
+            signal.setitimer(signal.ITIMER_REAL, remaining, previous_timer[1])
 
 
 # --------------------------------------------------------------------------- #
@@ -162,36 +198,43 @@ class Pipeline:
         """Run one job. Never raises for stage failures; they are reported as FAILED."""
         job_id = job.get("job_id")
         stage = "start"
+        deadline = float("inf")
 
         def step(name: str, fn: Callable[..., Any], *args: Any) -> Any:
             nonlocal stage
             stage = name
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"job exceeded {config.JOB_TIMEOUT_SECONDS} second timeout")
             started = time.monotonic()
             out = fn(*args)
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"job exceeded {config.JOB_TIMEOUT_SECONDS} second timeout")
             log.info("job_id=%s stage=%s done in %.2fs", job_id, name, time.monotonic() - started)
             return out
 
         try:
-            if not job_id:
-                raise ValueError("job has no job_id")
+            with _job_deadline(config.JOB_TIMEOUT_SECONDS) as deadline:
+                if not job_id:
+                    raise ValueError("job has no job_id")
 
-            step("status:running", self._api.post_status, job_id, "RUNNING")
+                step("status:running", self._api.post_status, job_id, "RUNNING")
 
-            # ExitStack guarantees sandbox cleanup, even when a later stage raises.
-            with ExitStack() as stack:
-                repo = stack.enter_context(step("sandbox", self._stages.acquire, job))
-                detection = step("detect", self._stages.detect, repo)
-                parsed = step("parse", self._stages.parse, repo, detection)
-                metrics = step("metrics", self._stages.compute_metrics, parsed)
+                # ExitStack guarantees sandbox cleanup, even when a later stage raises.
+                with ExitStack() as stack:
+                    repo = stack.enter_context(step("sandbox", self._stages.acquire, job))
+                    step("limits", validate_repository, repo)
+                    detection = step("detect", self._stages.detect, repo)
+                    parsed = step("parse", self._stages.parse, repo, detection)
+                    metrics = step("metrics", self._stages.compute_metrics, parsed)
 
-                graph = step("build_graph", self._stages.build_graph, parsed)
-                cycles = step("find_cycles", self._stages.find_cycles, graph)
-                architecture = step("detect_architecture", self._stages.detect_architecture, graph, parsed)
-                scores = step("compute_scores", self._stages.compute_scores, graph, cycles, architecture, metrics)
-                result = step("assemble", self._stages.assemble, job, graph, cycles, architecture, metrics, scores)
+                    graph = step("build_graph", self._stages.build_graph, parsed)
+                    cycles = step("find_cycles", self._stages.find_cycles, graph)
+                    architecture = step("detect_architecture", self._stages.detect_architecture, graph, parsed)
+                    scores = step("compute_scores", self._stages.compute_scores, graph, cycles, architecture, metrics)
+                    result = step("assemble", self._stages.assemble, job, graph, cycles, architecture, metrics, scores)
 
-                step("validate", self._validate_result, result)
-                step("post_result", self._api.post_result, job_id, result)
+                    step("validate", self._validate_result, result)
+                    step("post_result", self._api.post_result, job_id, result)
 
             log.info("job_id=%s completed", job_id)
         except Exception as exc:
