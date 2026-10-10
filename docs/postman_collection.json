@@ -1,0 +1,306 @@
+{
+    "info":  {
+                 "name":  "RepoDNA API",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+             },
+    "variable":  [
+                     {
+                         "key":  "baseUrl",
+                         "value":  "http://localhost:8080"
+                     },
+                     {
+                         "key":  "email",
+                         "value":  "postman.user@example.com"
+                     },
+                     {
+                         "key":  "internalKey",
+                         "value":  "PUT_YOUR_INTERNAL_API_KEY_HERE"
+                     },
+                     {
+                         "key":  "token",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "jobId",
+                         "value":  ""
+                     }
+                 ],
+    "item":  [
+                 {
+                     "name":  "1. Register",
+                     "request":  {
+                                     "method":  "POST",
+                                     "header":  [
+                                                    {
+                                                        "key":  "Content-Type",
+                                                        "value":  "application/json"
+                                                    }
+                                                ],
+                                     "url":  "{{baseUrl}}/auth/register",
+                                     "body":  {
+                                                  "raw":  "{\"email\":\"{{email}}\",\"password\":\"password123\"}",
+                                                  "mode":  "raw"
+                                              }
+                                 },
+                     "event":  [
+                                   {
+                                       "script":  {
+                                                      "exec":  [
+                                                                   "var j = pm.response.json(); pm.collectionVariables.set(\"token\", j.token || j.accessToken || j.access_token);"
+                                                               ],
+                                                      "type":  "text/javascript"
+                                                  },
+                                       "listen":  "test"
+                                   }
+                               ]
+                 },
+                 {
+                     "name":  "2. Login (use if Register says 409)",
+                     "request":  {
+                                     "method":  "POST",
+                                     "header":  [
+                                                    {
+                                                        "key":  "Content-Type",
+                                                        "value":  "application/json"
+                                                    }
+                                                ],
+                                     "url":  "{{baseUrl}}/auth/login",
+                                     "body":  {
+                                                  "raw":  "{\"email\":\"{{email}}\",\"password\":\"password123\"}",
+                                                  "mode":  "raw"
+                                              }
+                                 },
+                     "event":  [
+                                   {
+                                       "script":  {
+                                                      "exec":  [
+                                                                   "var j = pm.response.json(); pm.collectionVariables.set(\"token\", j.token || j.accessToken || j.access_token);"
+                                                               ],
+                                                      "type":  "text/javascript"
+                                                  },
+                                       "listen":  "test"
+                                   }
+                               ]
+                 },
+                 {
+                     "name":  "3. Create job",
+                     "request":  {
+                                     "method":  "POST",
+                                     "header":  [
+                                                    {
+                                                        "key":  "Content-Type",
+                                                        "value":  "application/json"
+                                                    }
+                                                ],
+                                     "url":  "{{baseUrl}}/jobs",
+                                     "auth":  {
+                                                  "bearer":  [
+                                                                 {
+                                                                     "key":  "token",
+                                                                     "type":  "string",
+                                                                     "value":  "{{token}}"
+                                                                 }
+                                                             ],
+                                                  "type":  "bearer"
+                                              },
+                                     "body":  {
+                                                  "raw":  "{\"repo_url\":\"https://github.com/repodna-demo/mini-flask-shop\"}",
+                                                  "mode":  "raw"
+                                              }
+                                 },
+                     "event":  [
+                                   {
+                                       "script":  {
+                                                      "exec":  [
+                                                                   "var j = pm.response.json(); pm.collectionVariables.set(\"jobId\", j.id || j.job_id || j.jobId);"
+                                                               ],
+                                                      "type":  "text/javascript"
+                                                  },
+                                       "listen":  "test"
+                                   }
+                               ]
+                 },
+                 {
+                     "name":  "4. List jobs",
+                     "request":  {
+                                     "method":  "GET",
+                                     "header":  [
+
+                                                ],
+                                     "url":  "{{baseUrl}}/jobs",
+                                     "auth":  {
+                                                  "bearer":  [
+                                                                 {
+                                                                     "key":  "token",
+                                                                     "type":  "string",
+                                                                     "value":  "{{token}}"
+                                                                 }
+                                                             ],
+                                                  "type":  "bearer"
+                                              }
+                                 }
+                 },
+                 {
+                     "name":  "5. Get job",
+                     "request":  {
+                                     "method":  "GET",
+                                     "header":  [
+
+                                                ],
+                                     "url":  "{{baseUrl}}/jobs/{{jobId}}",
+                                     "auth":  {
+                                                  "bearer":  [
+                                                                 {
+                                                                     "key":  "token",
+                                                                     "type":  "string",
+                                                                     "value":  "{{token}}"
+                                                                 }
+                                                             ],
+                                                  "type":  "bearer"
+                                              }
+                                 }
+                 },
+                 {
+                     "name":  "6. Worker: status RUNNING",
+                     "request":  {
+                                     "method":  "POST",
+                                     "header":  [
+                                                    {
+                                                        "key":  "X-Internal-Key",
+                                                        "value":  "{{internalKey}}"
+                                                    },
+                                                    {
+                                                        "key":  "Content-Type",
+                                                        "value":  "application/json"
+                                                    }
+                                                ],
+                                     "url":  "{{baseUrl}}/internal/jobs/{{jobId}}/status",
+                                     "body":  {
+                                                  "raw":  "{\"status\":\"RUNNING\"}",
+                                                  "mode":  "raw"
+                                              }
+                                 }
+                 },
+                 {
+                     "name":  "7. Worker: send result (sample fixture)",
+                     "request":  {
+                                     "method":  "POST",
+                                     "header":  [
+                                                    {
+                                                        "key":  "X-Internal-Key",
+                                                        "value":  "{{internalKey}}"
+                                                    },
+                                                    {
+                                                        "key":  "Content-Type",
+                                                        "value":  "application/json"
+                                                    }
+                                                ],
+                                     "url":  "{{baseUrl}}/internal/jobs/{{jobId}}/result",
+                                     "body":  {
+                                                  "raw":  "{\r\n  \"schema_version\": \"1.0.0\",\r\n  \"job_id\": \"{{jobId}}\",\r\n\r\n  \"repo_meta\": {\r\n    \"repo_url\": \"https://github.com/repodna-demo/mini-flask-shop.git\",\r\n    \"source_type\": \"git\",\r\n    \"total_files\": 6,\r\n    \"total_loc\": 540,\r\n    \"analyzed_at\": \"2026-09-20T14:32:07Z\"\r\n  },\r\n\r\n  \"languages\": [\r\n    {\r\n      \"name\": \"Python\",\r\n      \"file_count\": 6,\r\n      \"loc\": 540,\r\n      \"percentage\": 100.0\r\n    }\r\n  ],\r\n\r\n  \"frameworks\": [\r\n    {\r\n      \"name\": \"Flask\",\r\n      \"category\": \"web\"\r\n    }\r\n  ],\r\n\r\n  \"files\": [\r\n    { \"path\": \"src/app.py\", \"loc\": 45, \"cyclomatic\": 6, \"cognitive\": 8, \"max_nesting\": 2 },\r\n    { \"path\": \"src/routes/users.py\", \"loc\": 80, \"cyclomatic\": 12, \"cognitive\": 15, \"max_nesting\": 3 },\r\n    { \"path\": \"src/routes/orders.py\", \"loc\": 95, \"cyclomatic\": 14, \"cognitive\": 18, \"max_nesting\": 4 },\r\n    { \"path\": \"src/services/user_service.py\", \"loc\": 120, \"cyclomatic\": 20, \"cognitive\": 25, \"max_nesting\": 3 },\r\n    { \"path\": \"src/services/order_service.py\", \"loc\": 140, \"cyclomatic\": 24, \"cognitive\": 30, \"max_nesting\": 4 },\r\n    { \"path\": \"src/db/models.py\", \"loc\": 60, \"cyclomatic\": 5, \"cognitive\": 6, \"max_nesting\": 1 }\r\n  ],\r\n\r\n  \"hotspots\": [\r\n    { \"path\": \"src/services/order_service.py\", \"metric\": \"cyclomatic\", \"value\": 24 },\r\n    { \"path\": \"src/services/user_service.py\", \"metric\": \"cognitive\", \"value\": 25 },\r\n    { \"path\": \"src/routes/orders.py\", \"metric\": \"max_nesting\", \"value\": 4 }\r\n  ],\r\n\r\n  \"graph\": {\r\n    \"nodes\": [\r\n      { \"path\": \"src/app.py\", \"language\": \"python\", \"folder\": \"src\", \"fan_in\": 0, \"fan_out\": 2 },\r\n      { \"path\": \"src/routes/users.py\", \"language\": \"python\", \"folder\": \"src/routes\", \"fan_in\": 1, \"fan_out\": 1 },\r\n      { \"path\": \"src/routes/orders.py\", \"language\": \"python\", \"folder\": \"src/routes\", \"fan_in\": 1, \"fan_out\": 2 },\r\n      { \"path\": \"src/services/user_service.py\", \"language\": \"python\", \"folder\": \"src/services\", \"fan_in\": 2, \"fan_out\": 2 },\r\n      { \"path\": \"src/services/order_service.py\", \"language\": \"python\", \"folder\": \"src/services\", \"fan_in\": 2, \"fan_out\": 2 },\r\n      { \"path\": \"src/db/models.py\", \"language\": \"python\", \"folder\": \"src/db\", \"fan_in\": 3, \"fan_out\": 0 }\r\n    ],\r\n    \"edges\": [\r\n      { \"from\": \"src/app.py\", \"to\": \"src/routes/users.py\" },\r\n      { \"from\": \"src/app.py\", \"to\": \"src/routes/orders.py\" },\r\n      { \"from\": \"src/routes/users.py\", \"to\": \"src/services/user_service.py\" },\r\n      { \"from\": \"src/routes/orders.py\", \"to\": \"src/services/order_service.py\" },\r\n      { \"from\": \"src/services/user_service.py\", \"to\": \"src/db/models.py\" },\r\n      { \"from\": \"src/services/order_service.py\", \"to\": \"src/db/models.py\" },\r\n      { \"from\": \"src/services/order_service.py\", \"to\": \"src/services/user_service.py\" },\r\n      { \"from\": \"src/services/user_service.py\", \"to\": \"src/services/order_service.py\" },\r\n      { \"from\": \"src/routes/orders.py\", \"to\": \"src/db/models.py\" }\r\n    ]\r\n  },\r\n\r\n  \"cycles\": [\r\n    [\"src/services/order_service.py\", \"src/services/user_service.py\"]\r\n  ],\r\n\r\n  \"architecture\": {\r\n    \"pattern\": \"layered\",\r\n    \"evidence\": [\r\n      \"src/app.py\",\r\n      \"src/routes/users.py\",\r\n      \"src/routes/orders.py\",\r\n      \"src/services/user_service.py\",\r\n      \"src/services/order_service.py\",\r\n      \"src/db/models.py\"\r\n    ],\r\n    \"violations\": [\r\n      {\r\n        \"from\": \"src/routes/orders.py\",\r\n        \"to\": \"src/db/models.py\",\r\n        \"rule\": \"routes-must-not-access-db-directly\"\r\n      }\r\n    ]\r\n  },\r\n\r\n  \"scores\": {\r\n    \"architecture_dna\": 72.5,\r\n    \"code_dna\": 64.0,\r\n    \"quality_dna\": 78.3\r\n  }\r\n}",
+                                                  "mode":  "raw"
+                                              }
+                                 }
+                 },
+                 {
+                     "name":  "8. Result",
+                     "request":  {
+                                     "method":  "GET",
+                                     "header":  [
+
+                                                ],
+                                     "url":  "{{baseUrl}}/jobs/{{jobId}}/result",
+                                     "auth":  {
+                                                  "bearer":  [
+                                                                 {
+                                                                     "key":  "token",
+                                                                     "type":  "string",
+                                                                     "value":  "{{token}}"
+                                                                 }
+                                                             ],
+                                                  "type":  "bearer"
+                                              }
+                                 }
+                 },
+                 {
+                     "name":  "9. Graph",
+                     "request":  {
+                                     "method":  "GET",
+                                     "header":  [
+
+                                                ],
+                                     "url":  "{{baseUrl}}/jobs/{{jobId}}/graph",
+                                     "auth":  {
+                                                  "bearer":  [
+                                                                 {
+                                                                     "key":  "token",
+                                                                     "type":  "string",
+                                                                     "value":  "{{token}}"
+                                                                 }
+                                                             ],
+                                                  "type":  "bearer"
+                                              }
+                                 }
+                 },
+                 {
+                     "name":  "10. Dashboard",
+                     "request":  {
+                                     "method":  "GET",
+                                     "header":  [
+
+                                                ],
+                                     "url":  "{{baseUrl}}/jobs/{{jobId}}/dashboard",
+                                     "auth":  {
+                                                  "bearer":  [
+                                                                 {
+                                                                     "key":  "token",
+                                                                     "type":  "string",
+                                                                     "value":  "{{token}}"
+                                                                 }
+                                                             ],
+                                                  "type":  "bearer"
+                                              }
+                                 }
+                 },
+                 {
+                     "name":  "11. Cycles",
+                     "request":  {
+                                     "method":  "GET",
+                                     "header":  [
+
+                                                ],
+                                     "url":  "{{baseUrl}}/jobs/{{jobId}}/cycles",
+                                     "auth":  {
+                                                  "bearer":  [
+                                                                 {
+                                                                     "key":  "token",
+                                                                     "type":  "string",
+                                                                     "value":  "{{token}}"
+                                                                 }
+                                                             ],
+                                                  "type":  "bearer"
+                                              }
+                                 }
+                 },
+                 {
+                     "name":  "12. Violations",
+                     "request":  {
+                                     "method":  "GET",
+                                     "header":  [
+
+                                                ],
+                                     "url":  "{{baseUrl}}/jobs/{{jobId}}/violations",
+                                     "auth":  {
+                                                  "bearer":  [
+                                                                 {
+                                                                     "key":  "token",
+                                                                     "type":  "string",
+                                                                     "value":  "{{token}}"
+                                                                 }
+                                                             ],
+                                                  "type":  "bearer"
+                                              }
+                                 }
+                 }
+             ]
+}
