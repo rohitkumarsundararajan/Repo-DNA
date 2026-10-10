@@ -19,11 +19,12 @@ import tree_sitter_python
 import tree_sitter_typescript
 from tree_sitter import Language, Node, Parser, Query, QueryCursor
 
+from ..consumer import config
 from .models import CallInfo, ClassInfo, FunctionInfo, ImportInfo, ParsedFile
 
 logger = logging.getLogger(__name__)
 
-MAX_FILE_BYTES = 1024 * 1024
+MAX_FILE_BYTES = config.MAX_FILE_SIZE_MB * 1024 * 1024
 BINARY_SNIFF_BYTES = 8192
 _MAX_DOTTED_CALLEE_BYTES = 200
 
