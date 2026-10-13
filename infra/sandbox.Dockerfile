@@ -20,9 +20,15 @@ RUN git config --system core.hooksPath /dev/null \
  && git config --system protocol.allow never \
  && git config --system protocol.https.allow always
 
-# Non-root user, no secrets anywhere in the image
-RUN useradd --create-home --uid 10001 sandbox
+# Non-root user, no secrets anywhere in the image.
+# /work is created and owned by that user before switching to it: WORKDIR alone would
+# create it owned by root and the clone would fail with "permission denied".
+RUN useradd --create-home --uid 10001 sandbox \
+ && mkdir -p /work \
+ && chown sandbox:sandbox /work
 USER sandbox
+ENV HOME=/home/sandbox \
+    GIT_TERMINAL_PROMPT=0
 WORKDIR /work
 
 # The runner supplies the real command (git clone ..., madge --json ...)

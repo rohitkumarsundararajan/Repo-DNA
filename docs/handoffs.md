@@ -46,7 +46,7 @@ The JSON contract in `contract/` is the handshake between all three backend owne
 
 - **Key:** `repodna:jobs` (configurable via `QUEUE_JOBS_KEY`, default `repodna:jobs`)
 - **Producer:** API pushes with `LPUSH` after the job row is committed.
-- **Consumer:** worker reads with `BRPOP`.
+- **Consumer:** the worker moves each job atomically from the queue to its own processing list (`BLMOVE` to `repodna:jobs:processing:<WORKER_ID>`) and removes it only when the job is finished. If the worker stops mid-job, it marks that job `FAILED` (`worker_restarted`) on the next start; the user submits it again. Each worker replica needs its own `WORKER_ID`.
 - **Message:** JSON matching `contract/job_message.schema.json`.
 
 | Field | Meaning |
@@ -133,6 +133,15 @@ Names only. Real values live in `infra/.env`, which is never committed. `infra/.
 | `INTERNAL_API_KEY` | API, worker | Shared secret for `X-Internal-Key` |
 | `ZIP_DIR` | API | Where uploaded ZIPs are saved, default `./uploads` |
 | `JOB_RUNNING_TIMEOUT_MINUTES` | API | Stuck-job timeout, default 10 |
+| `QUEUE_KEY` | Worker | Queue key; compose sets it from `QUEUE_JOBS_KEY` so both sides always match |
+| `WORKER_ID` | Worker | Stable id of this worker replica (default `worker-1`) |
+| `API_URL` | Worker | API base URL (compose: `http://api-service:8080`) |
+| `SANDBOX_IMAGE` | Worker | Prebuilt sandbox image (default `repodna-sandbox:latest`) |
+| `ZIP_ROOT` | Worker | Where uploaded ZIPs are mounted read-only (default `/data/uploads`) |
+| `JOB_TIMEOUT_SECONDS` | Worker | Hard limit per job, default 480; keep below the API's stuck-job timeout |
+| `SANDBOX_TIMEOUT_SECONDS`, `SANDBOX_MEMORY`, `SANDBOX_CPUS`, `SANDBOX_PIDS_LIMIT` | Worker | Sandbox limits (defaults 120 s, 1g, 1 CPU, 256 processes) |
+| `MAX_FILES`, `MAX_FILE_SIZE_MB`, `MAX_REPO_SIZE_MB` | Worker | Repository ceilings (defaults 10000, 50, 500) |
+| `ALLOWED_GIT_HOSTS` | Worker | Hosts that may be cloned (default `github.com,gitlab.com`) |
 
 Never hardcode secrets in code or commit them.
 
@@ -153,8 +162,9 @@ Services:
 |---|---|---|
 | `postgres` | `postgres:16` | Database (named volume, healthcheck) |
 | `redis` | `redis:7` | Job queue |
-| `api-service` | `backend/api-service/Dockerfile` (Java 21 base) | REST API |
-| `analysis-worker` | `backend/analysis-worker/Dockerfile` (Python 3.12) | Analysis pipeline |
+| `sandbox-image` | `infra/sandbox.Dockerfile` | Builds the `repodna-sandbox` image once and exits |
+| `api-service` | `backend/api-service/Dockerfile` (Java 21 base) | REST API; saves uploaded ZIPs to the `uploads` volume |
+| `analysis-worker` | `backend/analysis-worker/Dockerfile` (Python 3.12, built from the repo root so it contains `contract/`) | Analysis pipeline; reads ZIPs from the `uploads` volume (read-only); starts sandbox containers through the Docker socket |
 
 Flyway applies the migrations in `db/migrations/` when the API starts. Never edit an already applied migration; add a new `V` file.
 
@@ -180,12 +190,25 @@ mvn test
 
 Run `mvn test` before every push.
 
-## 9. Open items
+## 9. How the worker runs one job
+
+1. Takes the job from the queue and posts `RUNNING`.
+2. **Git job:** starts a disposable sandbox container (non-root, no capabilities, 1 GB memory, 1 CPU, process and file-size limits, 120 s time limit), runs `git clone --depth 1` for a public https GitHub or GitLab URL, copies the files out as a tar stream into a temporary folder and removes the container. **ZIP job:** safely extracts the uploaded ZIP from the shared `uploads` volume.
+3. Checks the repository limits, then detects languages and frameworks, parses Python, JavaScript and TypeScript files, computes metrics, builds the dependency graph, finds cycles, detects the architecture pattern and violations, and computes the three DNA scores.
+4. Validates the result against `contract/result.schema.json` and posts it. Any failure posts `FAILED` with a short message and always cleans up.
+
+Notes:
+
+- Only the clone runs in the sandbox. Parsing and metrics run in the worker container but only read files; they never execute repository code.
+- A repository with no Python, JavaScript or TypeScript files fails with a clear message instead of getting perfect scores.
+- Self imports (a file importing itself) are not reported as cycles; the contract needs at least two files.
+- The worker has Docker socket access (needed to start sandboxes), which is equivalent to root on the host. Run it on a trusted host only; a socket proxy is the next hardening step.
+
+## 10. Open items
 
 Decisions still to confirm with the team:
 
-- Sandbox scope: whether the whole analysis or only the clone runs in the sandbox container.
-- Where `madge` runs: worker image or `infra/sandbox.Dockerfile`.
-- Docker socket access for the worker in compose (needed for sandboxing).
-- `zip_path` is currently a local absolute path; compose needs a shared volume so the worker can read uploaded ZIPs.
+- Cleaning up uploaded ZIPs after a job finishes (they stay on the `uploads` volume).
+- Frameworks in the result use the language ecosystem as `category` (`python`, `javascript`, `java`).
+- Supporting more languages than Python, JavaScript and TypeScript.
 - DNA score formulas and exact cognitive complexity rules.

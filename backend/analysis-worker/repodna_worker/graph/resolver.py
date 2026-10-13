@@ -105,6 +105,17 @@ class ImportResolver:
 
         extensions = [".js", ".ts", ".tsx"]
 
+        # Specifier already names a file: "./util.js", "./Button.tsx".
+        if base.suffix in {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"}:
+            if base.is_file():
+                return base.resolve()
+            # TypeScript ESM style: "./util.js" really means util.ts / util.tsx.
+            if base.suffix in {".js", ".jsx"}:
+                for extension in (".ts", ".tsx"):
+                    candidate = base.with_suffix(extension)
+                    if candidate.is_file():
+                        return candidate.resolve()
+
         # Example:
         # ./UserService
         # -> UserService.js
