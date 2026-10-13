@@ -1,0 +1,9 @@
+# Used automatically by BuildKit for backend/analysis-worker/Dockerfile (context = repo root).
+# Send only what the image needs.
+*
+!backend/analysis-worker/requirements.txt
+!backend/analysis-worker/repodna_worker
+!contract
+**/__pycache__
+**/*.pyc
+backend/analysis-worker/repodna_worker/tests

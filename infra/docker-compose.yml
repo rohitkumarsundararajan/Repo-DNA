@@ -30,6 +30,17 @@ services:
       retries: 10
       start_period: 5s
 
+  # Builds the disposable sandbox image (used by the worker to clone untrusted
+  # repositories) and exits. It is a normal service so that
+  # `docker compose up --build` always builds it before the worker starts.
+  sandbox-image:
+    build:
+      context: .
+      dockerfile: sandbox.Dockerfile
+    image: repodna-sandbox:latest
+    command: ["true"]
+    restart: "no"
+
   api-service:
     build:
       context: ../backend/api-service
@@ -45,34 +56,58 @@ services:
       DB_USER: ${POSTGRES_USER:-repodna}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-repodna}
       SPRING_FLYWAY_LOCATIONS: filesystem:/db/migrations
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      JWT_SECRET: ${JWT_SECRET}
-      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      REDIS_HOST: redis
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in infra/.env}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?set INTERNAL_API_KEY in infra/.env}
+      QUEUE_JOBS_KEY: ${QUEUE_JOBS_KEY:-repodna:jobs}
+      JOB_RUNNING_TIMEOUT_MINUTES: ${JOB_RUNNING_TIMEOUT_MINUTES:-10}
+      # Uploaded ZIPs are saved here; the worker mounts the same volume read-only.
+      ZIP_DIR: /data/uploads
     volumes:
       - ../db/migrations:/db/migrations:ro
+      - uploads:/data/uploads
     ports:
       - "8080:8080"
 
   analysis-worker:
     build:
-      context: ../backend/analysis-worker
-      dockerfile: Dockerfile
+      # Repo root, so the image can include contract/ (the shared JSON schemas).
+      context: ..
+      dockerfile: backend/analysis-worker/Dockerfile
     restart: unless-stopped
+    init: true  # small init process as PID 1: forwards stop signals, reaps child processes
+    # A job can run for several minutes; give it time to finish on `docker compose stop`.
+    stop_grace_period: 2m
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
+      api-service:
+        condition: service_started
+      sandbox-image:
+        condition: service_completed_successfully
     environment:
-      # postgresql:// format expected by the Python DB client
-      DB_URL: postgresql://${POSTGRES_USER:-repodna}:${POSTGRES_PASSWORD:-repodna}@postgres:5432/${POSTGRES_DB:-repodna}
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
-    # Grants the worker access to the host's Docker engine so it can launch a
-    # disposable sandbox container per analysis job. The worker talks to the
-    # socket via the Python Docker SDK, not the Docker CLI.
+      REDIS_HOST: redis
+      QUEUE_KEY: ${QUEUE_JOBS_KEY:-repodna:jobs}
+      WORKER_ID: worker-1
+      API_URL: http://api-service:8080
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?set INTERNAL_API_KEY in infra/.env}
+      SANDBOX_IMAGE: repodna-sandbox:latest
+      ZIP_ROOT: /data/uploads
+      # Must stay below the API's JOB_RUNNING_TIMEOUT_MINUTES (default 10 min = 600 s).
+      JOB_TIMEOUT_SECONDS: ${JOB_TIMEOUT_SECONDS:-480}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
+      # Lets the worker start the disposable sandbox container for each job
+      # (through the Python Docker SDK, not the Docker CLI).
       - /var/run/docker.sock:/var/run/docker.sock
+      - uploads:/data/uploads:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, redis; redis.Redis(host=os.environ.get('REDIS_HOST', 'redis'), socket_timeout=3).ping()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
   pgdata:
+  uploads:
