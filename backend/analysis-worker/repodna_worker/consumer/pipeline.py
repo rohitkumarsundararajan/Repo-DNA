@@ -127,8 +127,9 @@ def _stub_assemble(job: dict, graph: Any, cycles: Any, architecture: Any, metric
 class ApiClient:
     """Posts status and results to the API service, secured by INTERNAL_API_KEY.
 
-    ASSUMPTIONS to confirm with the API owner: endpoint paths, HTTP methods,
-    header name, and that posting the result marks the job as completed.
+    Matches the API contract (docs/handoffs.md section 5): header `X-Internal-Key`,
+    POST /internal/jobs/{id}/status with {"status", "error"} and
+    POST /internal/jobs/{id}/result with the full result JSON.
     """
 
     def __init__(self, base_url: str, api_key: str, timeout: float = 10.0, attempts: int = 3) -> None:
@@ -136,19 +137,18 @@ class ApiClient:
         self._timeout = timeout
         self._attempts = attempts
         self._session = requests.Session()
-        self._session.headers.update({"X-Internal-Api-Key": api_key})
+        self._session.headers.update({"X-Internal-Key": api_key})
 
     @classmethod
     def from_env(cls) -> "ApiClient":
-        return cls(
-            base_url=os.getenv("API_BASE_URL", "http://api-service:8080"),
-            api_key=os.environ["INTERNAL_API_KEY"],
-        )
+        if not config.INTERNAL_API_KEY:
+            raise RuntimeError("INTERNAL_API_KEY is not set; the worker cannot call the API")
+        return cls(base_url=config.API_URL, api_key=config.INTERNAL_API_KEY)
 
     def post_status(self, job_id: str, status: str, message: str | None = None) -> None:
         body: dict[str, Any] = {"status": status}
         if message:
-            body["message"] = message
+            body["error"] = message
         self._post(f"/internal/jobs/{job_id}/status", body)
 
     def post_result(self, job_id: str, result: dict) -> None:
@@ -251,6 +251,10 @@ class Pipeline:
             shown = "; ".join(f"{'/'.join(map(str, e.path)) or '<root>'}: {e.message}" for e in errors[:5])
             more = f" (+{len(errors) - 5} more)" if len(errors) > 5 else ""
             raise ValueError(f"result failed schema validation: {shown}{more}")
+
+    def fail_job(self, job_id: str, message: str) -> None:
+        """Mark a job FAILED without running it (bad message, worker restarted, ...)."""
+        self._api.post_status(job_id, "FAILED", message[:MAX_FAILURE_MESSAGE_CHARS])
 
     def _report_failure(self, job_id: str | None, stage: str, exc: Exception) -> None:
         if not job_id:

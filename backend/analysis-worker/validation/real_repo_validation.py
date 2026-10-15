@@ -14,6 +14,8 @@ from repodna_worker.graph.cycles import find_cycles
 from repodna_worker.architecture.patterns import detect_pattern
 from repodna_worker.architecture.violations import detect_violations
 from repodna_worker.scoring.dna import calculate_dna_scores
+from repodna_worker.consumer.stages import graph_to_contract
+from repodna_worker.metrics.cyclomatic import compute_file_complexity
 
 
 def validate_repository(repo_path: str) -> None:
@@ -106,11 +108,27 @@ def validate_repository(repo_path: str) -> None:
     print("\n[6] Calculating DNA scores...")
 
     started = time.perf_counter()
+    # The scorer only understands plain dicts (it silently returns 100 for objects),
+    # so convert exactly like the real pipeline does (consumer/stages.py).
+    scoring_files = [
+        {
+            "path": item.path,
+            "functions": [
+                {
+                    "name": fn.function,
+                    "complexity": fn.complexity,
+                    "lines": fn.end_line - fn.start_line + 1,
+                }
+                for fn in compute_file_complexity(root / item.path, root=root)
+            ],
+        }
+        for item in parsed_files
+    ]
     scores = calculate_dna_scores(
-        graph=graph,
-        cycles=cycles,
-        architecture=architecture,
-        files=parsed_files,
+        graph=graph_to_contract(graph),
+        cycles=[cycle for cycle in cycles if len(cycle) >= 2],
+        architecture={**architecture, "violations": violations},
+        files=scoring_files,
     )
     timings["scoring"] = time.perf_counter() - started
 
